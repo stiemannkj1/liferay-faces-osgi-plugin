@@ -1,17 +1,15 @@
 /**
  * Copyright (c) 2000-2019 Liferay, Inc. All rights reserved.
  *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
+ * This library is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the Free
+ * Software Foundation; either version 2.1 of the License, or (at your option)
+ * any later version.
  *
- *    http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+ * This library is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more
+ * details.
  */
 package com.liferay.faces.osgi.plugin.internal;
 
@@ -27,11 +25,12 @@ import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarOutputStream;
 import java.util.jar.Manifest;
+
 import javax.xml.bind.DatatypeConverter;
 
+
 /**
- *
- * @author Kyle Stiemann
+ * @author  Kyle Stiemann
  */
 /* package-private */ final class JarGeneratorUtil {
 
@@ -51,9 +50,8 @@ import javax.xml.bind.DatatypeConverter;
 		throw new AssertionError();
 	}
 
-	/* package-private */ static void generateImportJar(File outputDirectory,
-		Set<String> servletContainerInitializerClasses, Set<String> additionalPackagesToImport) throws IOException,
-		NoSuchAlgorithmException {
+	/* package-private */ static void generateImportJar(File outputDirectory, Set<String> servletContainerInitializerClasses,
+		Set<String> additionalPackagesToImport) throws IOException, NoSuchAlgorithmException {
 
 		Manifest manifest = new Manifest();
 		Attributes mainAttributes = manifest.getMainAttributes();
@@ -74,10 +72,10 @@ import javax.xml.bind.DatatypeConverter;
 
 			String importedFacesPackagesDirectoryName = ImportedFacesPackages.class.getPackage().getName();
 			importedFacesPackagesDirectoryName = importedFacesPackagesDirectoryName.replace(".", "/") + "/";
-			jarOutputStream.putNextEntry(new JarEntry(importedFacesPackagesDirectoryName +
-				ImportedFacesPackagesClassByteCodeUtil.IMPORTED_FACES_PACKAGES_CLASS_FILE));
+			jarOutputStream.putNextEntry(new JarEntry(
+					importedFacesPackagesDirectoryName + ClassFileUtil.getClassFileName(ImportedFacesPackages.class)));
 
-			byte[] byteCode = ImportedFacesPackagesClassByteCodeUtil.getByteCode(additionalPackagesToImport);
+			byte[] byteCode = ImportedFacesPackagesByteCodeUtil.getModifiedByteCode(additionalPackagesToImport);
 			jarOutputStream.write(byteCode);
 
 			jarOutputStream.closeEntry();

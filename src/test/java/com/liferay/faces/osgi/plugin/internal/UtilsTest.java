@@ -26,10 +26,13 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.liferay.faces.osgi.plugin.internal.a.TestClassA;
+import com.liferay.faces.osgi.plugin.internal.b.TestClassB;
 
 
 /**
@@ -37,15 +40,17 @@ import org.junit.Test;
  */
 public final class UtilsTest {
 
-	private static Set<String> getClassNames(Set<Class<?>> classes) {
+	private static Set<String> getExpectedImportedFacesPackages(Set<Class<?>> importedClasses) {
 
-		LinkedHashSet<String> classNames = new LinkedHashSet<String>();
+		ImportedFacesPackages importedFacesPackages = new ImportedFacesPackages();
+		Set<String> defaultImportedFacesPackges = importedFacesPackages.getImportedPackages();
+		Set<String> expectedImportedFacesPackages = new LinkedHashSet<String>(defaultImportedFacesPackges);
 
-		for (Class<?> clazz : classes) {
-			classNames.add(clazz.getName());
+		for (Class<?> importedClass : importedClasses) {
+			expectedImportedFacesPackages.add(importedClass.getPackage().getName());
 		}
 
-		return Collections.unmodifiableSet(classNames);
+		return Collections.unmodifiableSet(expectedImportedFacesPackages);
 	}
 
 	private static <T> Set<T> unmodifiableSet(T... t) {
@@ -60,37 +65,16 @@ public final class UtilsTest {
 		return Collections.unmodifiableSet(linkedHashSet);
 	}
 
-	private static Set<String> getExpectedImportedFacesPackages(Set<Class<?>> importedClasses) {
-
-		ImportedFacesPackages importedFacesPackages = new ImportedFacesPackages();
-		Set<String> defaultImportedFacesPackges = importedFacesPackages.getImportedPackages();
-		Set<String> expectedImportedFacesPackages = new LinkedHashSet<String>(defaultImportedFacesPackges);
-		expectedImportedFacesPackages.addAll(getImportedFacesPackages(importedClasses));
-
-		return Collections.unmodifiableSet(expectedImportedFacesPackages);
-	}
-
-	private static Set<String> getImportedFacesPackages(Set<Class<?>> importedClasses) {
-
-		Set<String> importedFacesPackages = new LinkedHashSet<String>();
-
-		for (Class<?> importedClass : importedClasses) {
-			importedFacesPackages.add(importedClass.getPackage().getName());
-		}
-
-		return Collections.unmodifiableSet(importedFacesPackages);
-	}
-
 	@Test
 	public final void testImportedFacesPackagessClassUtil() throws IOException, LinkageError,
 		ReflectiveOperationException, SecurityException {
 
-		Set<Class<?>> importedClasses = unmodifiableSet(String.class, Integer.class, Boolean.class);
+		Set<Class<?>> importedClasses = unmodifiableSet(TestClassA.class, TestClassB.class);
 		Set<String> expectedImportedFacesPackages = getExpectedImportedFacesPackages(importedClasses);
-		ModifiedImportedPackagesClassLoader modifiedImportedPackagesClassLoader =
-			new ModifiedImportedPackagesClassLoader();
-		Set<String> modifiedImportedPackages = modifiedImportedPackagesClassLoader.getModifiedImportedPackages(
-			ImportedFacesPackagesClassByteCodeUtil.getByteCode(getClassNames(importedClasses)));
+		ModifiedImportFacesPackagesClassLoader modifiedImportFacesPackagesClassLoader =
+			new ModifiedImportFacesPackagesClassLoader(UtilsTest.class.getClassLoader());
+		Set<String> modifiedImportedPackages = modifiedImportFacesPackagesClassLoader.getModifiedImportedPackages(
+				importedClasses);
 
 		Assert.assertEquals(expectedImportedFacesPackages, modifiedImportedPackages);
 	}
@@ -103,85 +87,89 @@ public final class UtilsTest {
 
 		try {
 
-			Set<Class<?>> importedClasses = unmodifiableSet(String.class, Integer.class);
+			Set<Class<?>> importedClasses = unmodifiableSet(TestClassA.class, TestClassB.class);
 			Set<String> expectedImportedFacesPackages = getExpectedImportedFacesPackages(importedClasses);
-			Set<String> importedFacesPackages = getImportedFacesPackages(importedClasses);
 			temporaryDirectory = Files.createTempDirectory("com.liferay.faces.osgi.plugin-");
-			JarGeneratorUtil.generateImportJar(temporaryDirectory.toFile(),
-				unmodifiableSet("com.liferay.faces.Initializer"), importedFacesPackages);
-			Path generatedJarPath = Files.find(temporaryDirectory, 10, (path, basicFileAttributes) -> {
 
-				String fileName = path.toFile().getName();
-				return fileName.startsWith(JarGeneratorUtil.PLUGIN_ARTIFACT_ID) &&
-					fileName.endsWith(".jar");
-			}).findFirst().get();
-			URLClassLoader urlClassLoader = new ChildFirstURLClassLoader(new URL[]{ generatedJarPath.toUri().toURL() });
-			Class<?> modifiedImportedFacesPackagesClass =
-				urlClassLoader.loadClass(ImportedFacesPackages.class.getName());
-			Set<String> modifiedImportedPackages =
-				ModifiedImportedPackagesClassLoader.getModifiedImportedPackages(modifiedImportedFacesPackagesClass);
+			Set<String> importedClassesAsString = importedClasses.stream().map((clazz) -> { return clazz.getName(); })
+				.collect(Collectors.toSet());
+			JarGeneratorUtil.generateImportJar(temporaryDirectory.toFile(),
+				unmodifiableSet("com.liferay.faces.Initializer"), importedClassesAsString);
+
+			Path generatedJarPath = Files.find(temporaryDirectory, 10,
+					(path, basicFileAttributes) -> {
+
+						String fileName = path.toFile().getName();
+
+						return fileName.startsWith(JarGeneratorUtil.PLUGIN_ARTIFACT_ID) && fileName.endsWith(".jar");
+					}).findFirst().get();
+			ModifiedImportFacesPackagesClassLoader modifiedImportFacesPackagesClassLoader =
+				new ModifiedImportFacesPackagesClassLoader(generatedJarPath);
+			Set<String> modifiedImportedPackages = modifiedImportFacesPackagesClassLoader.getModifiedImportedPackages(
+					importedClasses);
 			Assert.assertEquals(expectedImportedFacesPackages, modifiedImportedPackages);
 		}
 		finally {
 
-			Files.walk(temporaryDirectory)
-                .map(Path::toFile)
-                .sorted(Comparator.reverseOrder())
-                .forEach(File::delete);
+			Files.walk(temporaryDirectory).map(Path::toFile).sorted(Comparator.reverseOrder()).forEach(File::delete);
 		}
 	}
 
-	private static final class ModifiedImportedPackagesClassLoader extends ClassLoader {
+	private static final class ModifiedImportFacesPackagesClassLoader extends URLClassLoader {
 
-		private Set<String> getModifiedImportedPackages(byte[] modifiedImportedFacesPackagesClassBytes)
-			throws LinkageError, ReflectiveOperationException, SecurityException {
-
-			Class<?> modifiedImportedFacesPackagesClass = defineClass(ImportedFacesPackages.class.getName(),
-					modifiedImportedFacesPackagesClassBytes, 0, modifiedImportedFacesPackagesClassBytes.length);
-			resolveClass(modifiedImportedFacesPackagesClass);
-
-			return getModifiedImportedPackages(modifiedImportedFacesPackagesClass);
+		private ModifiedImportFacesPackagesClassLoader(Path generatedJarPath) throws IOException {
+			super(new URL[] { generatedJarPath.toUri().toURL() }, null);
 		}
 
-		private static Set<String> getModifiedImportedPackages(Class<?> modifiedImportedFacesPackagesClass)
-			throws ReflectiveOperationException, SecurityException {
+		private ModifiedImportFacesPackagesClassLoader(ClassLoader parent) {
+			super(new URL[] {}, parent);
+		}
+
+		private Set<String> getModifiedImportedPackages(Set<Class<?>> importedClasses) throws IOException,
+			ReflectiveOperationException, SecurityException {
+
+			Set<String> additionalImportedClassPackages = new LinkedHashSet<String>();
+
+			for (Class<?> importedClass : importedClasses) {
+
+				byte[] classBytes = ClassFileUtil.getClassBytes(importedClass);
+				reinitializeClassForCurrentClassLoader(importedClass, classBytes);
+				additionalImportedClassPackages.add(importedClass.getName());
+			}
+
+			additionalImportedClassPackages = Collections.unmodifiableSet(additionalImportedClassPackages);
+
+			byte[] classBytes = ImportedFacesPackagesByteCodeUtil.getModifiedByteCode(additionalImportedClassPackages);
+			Class<?> modifiedImportedFacesPackagesClass = reinitializeClassForCurrentClassLoader(
+					ImportedFacesPackages.class, classBytes);
 
 			Method getImportedPackagesMethod = modifiedImportedFacesPackagesClass.getMethod("getImportedPackages");
 			Object modifiedImportedFacesPackagesInstance = modifiedImportedFacesPackagesClass.newInstance();
 
 			return (Set<String>) getImportedPackagesMethod.invoke(modifiedImportedFacesPackagesInstance);
 		}
-	}
 
-	private static final class ChildFirstURLClassLoader extends URLClassLoader {
+		private Class<?> reinitializeClassForCurrentClassLoader(Class<?> clazz, byte[] classBytes) throws IOException {
 
-		private ChildFirstURLClassLoader(URL[] urls) {
-			super(urls);
-		}
+			Package package_ = clazz.getPackage();
+			String packageName = package_.getName();
 
-		@Override
-		public Class<?> loadClass(String name) throws ClassNotFoundException {
+			if (getPackage(packageName) == null) {
 
-			Class<?> loadedClass = null;
-
-			try {
-
-				loadedClass = findClass(name);
-				resolveClass(loadedClass);
-			}
-			catch (ClassNotFoundException e1) {
-
-				try {
-					loadedClass = super.loadClass(name);
-				}
-				catch (ClassNotFoundException e2) {
-
-					ClassLoader systemClassLoader = getSystemClassLoader();
-					loadedClass = systemClassLoader.loadClass(name);
-				}
+				String specificationTitle = package_.getSpecificationTitle();
+				String specificationVersion = package_.getSpecificationVersion();
+				String specificationVendor = package_.getSpecificationVendor();
+				String implementationTitle = package_.getImplementationTitle();
+				String implementationVersion = package_.getImplementationVersion();
+				String implementationVendor = package_.getImplementationVendor();
+				definePackage(packageName, specificationTitle, specificationVersion, specificationVendor,
+					implementationTitle, implementationVersion, implementationVendor, null);
 			}
 
-			return loadedClass;
+			Class<?> reinitializedClass = defineClass(clazz.getName(), classBytes, 0, classBytes.length);
+			resolveClass(reinitializedClass);
+
+			return reinitializedClass;
 		}
 	}
 }
