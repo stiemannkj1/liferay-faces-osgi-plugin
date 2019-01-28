@@ -17,7 +17,10 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.file.CopyOption;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Set;
@@ -50,8 +53,8 @@ import javax.xml.bind.DatatypeConverter;
 		throw new AssertionError();
 	}
 
-	/* package-private */ static void generateImportJar(File outputDirectory, Set<String> servletContainerInitializerClasses,
-		Set<String> additionalPackagesToImport) throws IOException, NoSuchAlgorithmException {
+	/* package-private */ static String generateImportJar(File outputDirectory, Set<String> servletContainerInitializerClasses,
+		Set<String> additionalPackagesToImport) throws IOException {
 
 		Manifest manifest = new Manifest();
 		Attributes mainAttributes = manifest.getMainAttributes();
@@ -63,7 +66,6 @@ import javax.xml.bind.DatatypeConverter;
 		File generatedJarFile = new File(generatedJarOutputDir, GENERATED_JAR_FILE_NAME_TEMPLATE);
 		FileOutputStream fileOutputStream = null;
 		JarOutputStream jarOutputStream = null;
-		String generatedJarFileName;
 
 		try {
 
@@ -90,16 +92,24 @@ import javax.xml.bind.DatatypeConverter;
 			printWriter.flush();
 			jarOutputStream.closeEntry();
 
-			MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-			byte[] bytes = Files.readAllBytes(generatedJarFile.toPath());
-			String generatedJarMD5Sum = DatatypeConverter.printHexBinary(messageDigest.digest(bytes));
-			generatedJarFileName = GENERATED_JAR_FILE_NAME_TEMPLATE.replace(MD5SUM_TOKEN, generatedJarMD5Sum);
+			MessageDigest messageDigest;
 
-			boolean renamedFile = generatedJarFile.renameTo(new File(generatedJarOutputDir, generatedJarFileName));
-
-			if (!renamedFile) {
-				throw new IOException("TODO");
+			try {
+				messageDigest = MessageDigest.getInstance("MD5");
 			}
+			catch (NoSuchAlgorithmException e) {
+				throw new IOException("Unable to generate jar due to the following error:", e);
+			}
+
+			Path generatedJarFilePath = generatedJarFile.toPath();
+
+			byte[] bytes = Files.readAllBytes(generatedJarFilePath);
+			String generatedJarMD5Sum = DatatypeConverter.printHexBinary(messageDigest.digest(bytes));
+			String generatedJarMD5FileName = GENERATED_JAR_FILE_NAME_TEMPLATE.replace(MD5SUM_TOKEN, generatedJarMD5Sum);
+			Path generatedJarMD5FilePath = new File(generatedJarOutputDir, generatedJarMD5FileName).toPath();
+
+			return Files.move(generatedJarFilePath, generatedJarMD5FilePath, StandardCopyOption.REPLACE_EXISTING)
+				.toString();
 		}
 		finally {
 

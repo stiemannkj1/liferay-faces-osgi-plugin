@@ -53,7 +53,7 @@ import org.codehaus.plexus.util.xml.Xpp3Dom;
  * Goal which touches a timestamp file.
  */
 @Mojo(name = "liferay-faces-osgi-plugin", defaultPhase = LifecyclePhase.PACKAGE)
-public class LiferayFacesOSGiPluginMojo extends AbstractMojo {
+public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 
 	// Private Constants
 	private static final String META_INF = "META-INF/";
@@ -75,7 +75,8 @@ public class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project}", required = true)
 	private MavenProject project;
 
-	public void execute() throws MojoExecutionException {
+	@Override
+	public final void execute() throws MojoExecutionException {
 
 		Set<String> servletConainerIntializerClasses = new LinkedHashSet<String>();
 		InputStream inputStream = null;
@@ -152,58 +153,14 @@ public class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 
 		// TODO
 		// Use ASM java to modify ImportedFacesPackages.class to add all imports in a static initializer
-		Manifest manifest = new Manifest();
-		Attributes mainAttributes = manifest.getMainAttributes();
-		mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
-
-		File generatedJarOutputDir = new File(outputDirectory, PLUGIN_ARTIFACT_ID);
-		generatedJarOutputDir.mkdirs();
-
-		File generatedJarFile = new File(generatedJarOutputDir, GENERATED_JAR_FILE_NAME_TEMPLATE);
-		FileOutputStream fileOutputStream = null;
-		JarOutputStream jarOutputStream = null;
-		String generatedJarFileName;
+		String generatedJarFilePath;
 
 		try {
-
-			fileOutputStream = new FileOutputStream(generatedJarFile);
-			jarOutputStream = new JarOutputStream(fileOutputStream, manifest);
-
-			String importedFacesPackagesDirectoryName = ImportedFacesPackages.class.getPackage().getName();
-			importedFacesPackagesDirectoryName = importedFacesPackagesDirectoryName.replace(".", "/") + "/";
-			jarOutputStream.putNextEntry(new JarEntry(importedFacesPackagesDirectoryName));
-			jarOutputStream.closeEntry();
-			jarOutputStream.putNextEntry(new JarEntry(META_INF_SERVICES));
-			jarOutputStream.closeEntry();
-			jarOutputStream.putNextEntry(new JarEntry(SERVLET_CONTAINER_INITIALIZER_FILE_PATH));
-
-			PrintWriter printWriter = new PrintWriter(jarOutputStream);
-
-			for (String servletContainerIntializerClass : servletConainerIntializerClasses) {
-				printWriter.println(servletContainerIntializerClass);
-			}
-
-			printWriter.println();
-			jarOutputStream.closeEntry();
-
-			MessageDigest messageDigest = MessageDigest.getInstance("MD5");
-			byte[] bytes = Files.readAllBytes(generatedJarFile.toPath());
-			String generatedJarMD5Sum = DatatypeConverter.printHexBinary(messageDigest.digest(bytes));
-			generatedJarFileName = GENERATED_JAR_FILE_NAME_TEMPLATE.replace(MD5SUM_TOKEN, generatedJarMD5Sum);
-
-			boolean renamedFile = generatedJarFile.renameTo(new File(generatedJarOutputDir, generatedJarFileName));
-
-			if (!renamedFile) {
-				throw new IOException("TODO");
-			}
+			generatedJarFilePath = JarGeneratorUtil.generateImportJar(outputDirectory, servletConainerIntializerClasses,
+					importedClasses);
 		}
-		catch (IOException | NoSuchAlgorithmException e) {
+		catch (IOException e) {
 			throw new MojoExecutionException("TODO", e);
-		}
-		finally {
-
-			CloseableUtil.close(jarOutputStream);
-			CloseableUtil.close(fileOutputStream);
 		}
 
 		// Add JAR to maven-war-plugin config
@@ -216,7 +173,7 @@ public class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 				<targetPath>WEB-INF/lib</targetPath>
 				<directory>${project.build.directory}/com.liferay.faces.osgi.plugin</directory>
 				<includes>
-					<include>com.liferay.faces.osgi.plugin.generate-${generated.jar.md5}.jar</include>
+					<include>com.liferay.faces.osgi.plugin.generated-${generated.jar.md5}.jar</include>
 				</includes>
 			</resource>
 		</webResource>
@@ -247,7 +204,7 @@ public class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 		resource.addChild(includes);
 
 		Xpp3Dom xpp3Dom = new Xpp3Dom("include");
-		xpp3Dom.setValue(generatedJarFileName);
+		xpp3Dom.setValue(generatedJarFilePath);
 		// Add modified ImportedFacesPackages.class and ServletContainerInitializer to JAR Add JAR to WEB-INF/lib of
 		// WAR.
 	}

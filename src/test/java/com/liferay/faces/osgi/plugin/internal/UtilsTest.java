@@ -103,6 +103,7 @@ public final class UtilsTest {
 
 						return fileName.startsWith(JarGeneratorUtil.PLUGIN_ARTIFACT_ID) && fileName.endsWith(".jar");
 					}).findFirst().get();
+
 			ModifiedImportFacesPackagesClassLoader modifiedImportFacesPackagesClassLoader =
 				new ModifiedImportFacesPackagesClassLoader(generatedJarPath);
 			Set<String> modifiedImportedPackages = modifiedImportFacesPackagesClassLoader.getModifiedImportedPackages(
