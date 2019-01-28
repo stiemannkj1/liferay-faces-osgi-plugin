@@ -41,13 +41,9 @@ import javax.xml.bind.DatatypeConverter;
 	/* package-private */ static final String PLUGIN_ARTIFACT_ID = "com.liferay.faces.osgi.plugin";
 
 	// Private Constants
-	private static final String META_INF = "META-INF/";
-	private static final String META_INF_SERVICES = META_INF + "services/";
 	private static final String MD5SUM_TOKEN = "{MD5SUM}";
-	private static final String GENERATED_JAR_FILE_NAME_TEMPLATE = PLUGIN_ARTIFACT_ID + ".generated-" + MD5SUM_TOKEN +
-		".jar";
-	private static final String SERVLET_CONTAINER_INITIALIZER_FILE_PATH = META_INF_SERVICES +
-		"javax.servlet.ServletContainerInitializer";
+	private static final String GENERATED_JAR_FILE_NAME_TEMPLATE = LiferayFacesOSGiPluginMojo.PLUGIN_ARTIFACT_ID +
+		".generated-" + MD5SUM_TOKEN + ".jar";
 
 	private JarGeneratorUtil() {
 		throw new AssertionError();
@@ -81,7 +77,8 @@ import javax.xml.bind.DatatypeConverter;
 			jarOutputStream.write(byteCode);
 
 			jarOutputStream.closeEntry();
-			jarOutputStream.putNextEntry(new JarEntry(SERVLET_CONTAINER_INITIALIZER_FILE_PATH));
+			jarOutputStream.putNextEntry(new JarEntry(
+					LiferayFacesOSGiPluginMojo.SERVLET_CONTAINER_INITIALIZER_FILE_PATH));
 
 			PrintWriter printWriter = new PrintWriter(jarOutputStream);
 

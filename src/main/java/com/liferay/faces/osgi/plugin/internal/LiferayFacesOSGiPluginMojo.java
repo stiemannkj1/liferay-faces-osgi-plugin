@@ -15,27 +15,17 @@ package com.liferay.faces.osgi.plugin.internal;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.PrintWriter;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
-import java.util.jar.JarOutputStream;
-import java.util.jar.Manifest;
-
-import javax.xml.bind.DatatypeConverter;
 
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.model.Plugin;
@@ -55,17 +45,14 @@ import org.codehaus.plexus.util.xml.Xpp3Dom;
 @Mojo(name = "liferay-faces-osgi-plugin", defaultPhase = LifecyclePhase.PACKAGE)
 public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 
-	// Private Constants
-	private static final String META_INF = "META-INF/";
-	private static final String META_INF_SERVICES = META_INF + "services/";
-	private static final String FACES_CONFIG_XML = "faces-config.xml";
-	private static final String META_INF_FACES_CONFIG_XML = META_INF + FACES_CONFIG_XML;
-	private static final String PLUGIN_ARTIFACT_ID = "com.liferay.faces.osgi.plugin";
-	private static final String PROJECT_BUILD_DIRECTORY_PROPERTY = "${project.build.directory}";
-	private static final String MD5SUM_TOKEN = "{MD5SUM}";
-	private static final String GENERATED_JAR_FILE_NAME_TEMPLATE = PLUGIN_ARTIFACT_ID + ".generated-" + MD5SUM_TOKEN +
-		".jar";
-	private static final String SERVLET_CONTAINER_INITIALIZER_FILE_PATH = META_INF_SERVICES +
+	// Package-Private Constants
+	/* package-private */ static final String META_INF = "META-INF/";
+	/* package-private */ static final String META_INF_SERVICES = META_INF + "services/";
+	/* package-private */ static final String FACES_CONFIG_XML = "faces-config.xml";
+	/* package-private */ static final String META_INF_FACES_CONFIG_XML = META_INF + FACES_CONFIG_XML;
+	/* package-private */ static final String PLUGIN_ARTIFACT_ID = "com.liferay.faces.osgi.plugin";
+	/* package-private */ static final String PROJECT_BUILD_DIRECTORY_PROPERTY = "${project.build.directory}";
+	/* package-private */ static final String SERVLET_CONTAINER_INITIALIZER_FILE_PATH = META_INF_SERVICES +
 		"javax.servlet.ServletContainerInitializer";
 
 	// Private Data Members
@@ -205,7 +192,5 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 
 		Xpp3Dom xpp3Dom = new Xpp3Dom("include");
 		xpp3Dom.setValue(generatedJarFilePath);
-		// Add modified ImportedFacesPackages.class and ServletContainerInitializer to JAR Add JAR to WEB-INF/lib of
-		// WAR.
 	}
 }
