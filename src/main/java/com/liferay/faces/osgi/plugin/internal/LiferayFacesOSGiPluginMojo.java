@@ -13,36 +13,33 @@
  */
 package com.liferay.faces.osgi.plugin.internal;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.UncheckedIOException;
-import java.nio.charset.StandardCharsets;
-import java.util.Enumeration;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathException;
+
 import org.apache.maven.artifact.Artifact;
-import org.apache.maven.model.Plugin;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.logging.Log;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.Parameter;
+import org.apache.maven.plugins.annotations.ResolutionScope;
 import org.apache.maven.project.MavenProject;
-
-import org.codehaus.plexus.util.xml.Xpp3Dom;
 
 
 /**
- * Goal which touches a timestamp file.
+ * @author  Kyle Stiemann
  */
-@Mojo(name = "liferay-faces-osgi-plugin", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(
+	name = "generate-package-import-jar", defaultPhase = LifecyclePhase.PREPARE_PACKAGE,
+	requiresDependencyCollection = ResolutionScope.COMPILE, requiresDependencyResolution = ResolutionScope.COMPILE
+)
 public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 
 	// Package-Private Constants
@@ -56,6 +53,9 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 		"javax.servlet.ServletContainerInitializer";
 
 	// Private Data Members
+	@Parameter(defaultValue = "${project.build.finalName}", required = true)
+	private String buildFinalName;
+
 	@Parameter(defaultValue = PROJECT_BUILD_DIRECTORY_PROPERTY, required = true)
 	private File outputDirectory;
 
@@ -65,35 +65,8 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 	@Override
 	public final void execute() throws MojoExecutionException {
 
-		Set<String> servletConainerIntializerClasses = new LinkedHashSet<String>();
-		InputStream inputStream = null;
-		InputStreamReader inputStreamReader = null;
-		BufferedReader bufferedReader = null;
-
-		try {
-
-			inputStream = LiferayFacesOSGiPluginMojo.class.getResourceAsStream("/" +
-					SERVLET_CONTAINER_INITIALIZER_FILE_PATH);
-			inputStreamReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
-			bufferedReader = new BufferedReader(inputStreamReader);
-
-			bufferedReader.lines().filter((String line) -> { return !line.trim().isEmpty(); }).forEach((line) -> {
-				servletConainerIntializerClasses.add(line);
-			});
-		}
-		catch (UncheckedIOException e) {
-			throw new MojoExecutionException("TODO", e);
-		}
-		finally {
-
-			CloseableUtil.close(bufferedReader);
-			CloseableUtil.close(inputStreamReader);
-			CloseableUtil.close(inputStream);
-		}
-
-		Set<String> importedClasses = new HashSet<String>();
-		importedClasses.addAll(servletConainerIntializerClasses);
-
+		Log log = getLog();
+		Set<JarFile> facesJars = new HashSet<JarFile>();
 		Set<Artifact> artifacts = project.getArtifacts();
 
 		for (Artifact artifact : artifacts) {
@@ -104,93 +77,31 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 			if (Artifact.SCOPE_PROVIDED.equalsIgnoreCase(scope) && "jar".equalsIgnoreCase(type)) {
 
 				try {
-
-					File artifactFile = artifact.getFile();
-					JarFile artifactJarFile = new JarFile(artifactFile);
-					Enumeration<JarEntry> entries = artifactJarFile.entries();
-
-					while (entries.hasMoreElements()) {
-
-						JarEntry jarEntry = entries.nextElement();
-						String name = jarEntry.getName();
-						boolean facesConfig = META_INF_FACES_CONFIG_XML.equals(name) ||
-							(name.startsWith(META_INF) && name.endsWith("." + FACES_CONFIG_XML));
-
-						if (facesConfig || (name.startsWith(META_INF) && name.endsWith(".taglib.xml"))) {
-
-							inputStream = artifactJarFile.getInputStream(jarEntry);
-
-							if (facesConfig) {
-								// TODO add imports
-							}
-							else {
-								// TODO add imports
-							}
-						}
-					}
+					facesJars.add(new JarFile(artifact.getFile()));
 				}
 				catch (IOException e) {
-					getLog().error("TODO", e);
-				}
-				finally {
-					CloseableUtil.close(inputStream);
+					log.error("Failed to convert " + artifact.getGroupId() + ":" + artifact.getArtifactId() +
+						" into JarFile. Unable to add imports from this Faces Jar.", e);
 				}
 			}
 		}
 
-		// TODO
-		// Use ASM java to modify ImportedFacesPackages.class to add all imports in a static initializer
-		String generatedJarFilePath;
+		// Add JAR to maven-war-plugin config
+		String warFolderName = buildFinalName.replaceFirst(".war$", "");
+		String warLibDirectoryPath = JarGeneratorUtil.getFilePath(outputDirectory.toString(), warFolderName, "WEB-INF",
+				"lib");
+		File warLibDirectory = new File(warLibDirectoryPath);
 
 		try {
-			generatedJarFilePath = JarGeneratorUtil.generateImportJar(outputDirectory, servletConainerIntializerClasses,
-					importedClasses);
+
+			Set<String> defaultServletContainerInitializerClassNames = ServletContainerInitializerUtil
+				.getDefaultClassNames();
+			Set<String> importedClasses = FacesXMLUtil.getClassNames(facesJars, log);
+			JarGeneratorUtil.generateImportJar(warLibDirectory, defaultServletContainerInitializerClassNames,
+				importedClasses);
 		}
-		catch (IOException e) {
+		catch (IOException | ParserConfigurationException | XPathException e) {
 			throw new MojoExecutionException("TODO", e);
 		}
-
-		// Add JAR to maven-war-plugin config
-
-		//J-
-		/*
-		<webResource>
-			<!-- ...your config here... -->
-			<resource>
-				<targetPath>WEB-INF/lib</targetPath>
-				<directory>${project.build.directory}/com.liferay.faces.osgi.plugin</directory>
-				<includes>
-					<include>com.liferay.faces.osgi.plugin.generated-${generated.jar.md5}.jar</include>
-				</includes>
-			</resource>
-		</webResource>
-		*/
-		//J+
-		Plugin plugin = project.getPlugin("org.apache.maven.plugins:maven-war-plugin");
-		Xpp3Dom configuration = (Xpp3Dom) plugin.getConfiguration();
-		Xpp3Dom webResources = configuration.getChild("webResources");
-
-		if (webResources == null) {
-
-			webResources = new Xpp3Dom("webResources");
-			configuration.addChild(webResources);
-		}
-
-		Xpp3Dom resource = new Xpp3Dom("resource");
-		webResources.addChild(resource);
-
-		Xpp3Dom targetPath = new Xpp3Dom("targetPath");
-		targetPath.setValue("WEB-INF/lib");
-		resource.addChild(targetPath);
-
-		Xpp3Dom directory = new Xpp3Dom("directory");
-		directory.setValue(PROJECT_BUILD_DIRECTORY_PROPERTY + "/" + PLUGIN_ARTIFACT_ID);
-		resource.addChild(directory);
-
-		Xpp3Dom includes = new Xpp3Dom("includes");
-		resource.addChild(includes);
-
-		Xpp3Dom xpp3Dom = new Xpp3Dom("include");
-		xpp3Dom.setValue(generatedJarFilePath);
 	}
 }

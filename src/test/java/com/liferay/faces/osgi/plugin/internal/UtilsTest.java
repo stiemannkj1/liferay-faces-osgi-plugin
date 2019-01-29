@@ -25,12 +25,18 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
+import java.util.ServiceLoader;
 import java.util.Set;
 import java.util.stream.Collectors;
+
+import javax.servlet.ServletContainerInitializer;
+import javax.servlet.ServletContext;
+import javax.servlet.ServletException;
 
 import org.junit.Assert;
 import org.junit.Test;
 
+import com.liferay.faces.TestServletContainerInitializer;
 import com.liferay.faces.osgi.plugin.internal.a.TestClassA;
 import com.liferay.faces.osgi.plugin.internal.b.TestClassB;
 
@@ -66,6 +72,11 @@ public final class UtilsTest {
 	}
 
 	@Test
+	public final void testFacesXMLUtil() throws IOException {
+		Assert.fail("TODO");
+	}
+
+	@Test
 	public final void testImportedFacesPackagessClassUtil() throws IOException, LinkageError,
 		ReflectiveOperationException, SecurityException {
 
@@ -94,7 +105,7 @@ public final class UtilsTest {
 			Set<String> importedClassesAsString = importedClasses.stream().map((clazz) -> { return clazz.getName(); })
 				.collect(Collectors.toSet());
 			JarGeneratorUtil.generateImportJar(temporaryDirectory.toFile(),
-				unmodifiableSet("com.liferay.faces.Initializer"), importedClassesAsString);
+				unmodifiableSet(TestServletContainerInitializer.class.getName()), importedClassesAsString);
 
 			Path generatedJarPath = Files.find(temporaryDirectory, 10,
 					(path, basicFileAttributes) -> {
@@ -102,6 +113,7 @@ public final class UtilsTest {
 						String fileName = path.toFile().getName();
 
 						return fileName.startsWith(JarGeneratorUtil.PLUGIN_ARTIFACT_ID) && fileName.endsWith(".jar");
+
 					}).findFirst().get();
 
 			ModifiedImportFacesPackagesClassLoader modifiedImportFacesPackagesClassLoader =
@@ -109,6 +121,20 @@ public final class UtilsTest {
 			Set<String> modifiedImportedPackages = modifiedImportFacesPackagesClassLoader.getModifiedImportedPackages(
 					importedClasses);
 			Assert.assertEquals(expectedImportedFacesPackages, modifiedImportedPackages);
+
+			modifiedImportFacesPackagesClassLoader.reinitializeClassForCurrentClassLoader(ServletContext.class);
+			modifiedImportFacesPackagesClassLoader.reinitializeClassForCurrentClassLoader(ServletException.class);
+
+			Class<?> servletContainerIntiailizerClass =
+				modifiedImportFacesPackagesClassLoader.reinitializeClassForCurrentClassLoader(
+					ServletContainerInitializer.class);
+			modifiedImportFacesPackagesClassLoader.reinitializeClassForCurrentClassLoader(
+				TestServletContainerInitializer.class);
+
+			ServiceLoader serviceLoader = ServiceLoader.load(servletContainerIntiailizerClass,
+					modifiedImportFacesPackagesClassLoader);
+			Assert.assertEquals(TestServletContainerInitializer.class.getName(),
+				serviceLoader.iterator().next().getClass().getName());
 		}
 		finally {
 
@@ -133,8 +159,7 @@ public final class UtilsTest {
 
 			for (Class<?> importedClass : importedClasses) {
 
-				byte[] classBytes = ClassFileUtil.getClassBytes(importedClass);
-				reinitializeClassForCurrentClassLoader(importedClass, classBytes);
+				reinitializeClassForCurrentClassLoader(importedClass);
 				additionalImportedClassPackages.add(importedClass.getName());
 			}
 
@@ -148,6 +173,13 @@ public final class UtilsTest {
 			Object modifiedImportedFacesPackagesInstance = modifiedImportedFacesPackagesClass.newInstance();
 
 			return (Set<String>) getImportedPackagesMethod.invoke(modifiedImportedFacesPackagesInstance);
+		}
+
+		private Class<?> reinitializeClassForCurrentClassLoader(Class<?> clazz) throws IOException {
+
+			byte[] classBytes = ClassFileUtil.getClassBytes(clazz);
+
+			return reinitializeClassForCurrentClassLoader(clazz, classBytes);
 		}
 
 		private Class<?> reinitializeClassForCurrentClassLoader(Class<?> clazz, byte[] classBytes) throws IOException {

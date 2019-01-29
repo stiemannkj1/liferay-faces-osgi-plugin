@@ -17,12 +17,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.nio.file.CopyOption;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.jar.Attributes;
 import java.util.jar.JarEntry;
@@ -49,17 +49,15 @@ import javax.xml.bind.DatatypeConverter;
 		throw new AssertionError();
 	}
 
-	/* package-private */ static String generateImportJar(File outputDirectory, Set<String> servletContainerInitializerClasses,
-		Set<String> additionalPackagesToImport) throws IOException {
+	/* package-private */ static void generateImportJar(File outputDirectory, Set<String> servletContainerInitializerClasses,
+		Set<String> additionalClassesToImport) throws IOException {
 
 		Manifest manifest = new Manifest();
 		Attributes mainAttributes = manifest.getMainAttributes();
 		mainAttributes.put(Attributes.Name.MANIFEST_VERSION, "1.0");
+		outputDirectory.mkdirs();
 
-		File generatedJarOutputDir = new File(outputDirectory, PLUGIN_ARTIFACT_ID);
-		generatedJarOutputDir.mkdirs();
-
-		File generatedJarFile = new File(generatedJarOutputDir, GENERATED_JAR_FILE_NAME_TEMPLATE);
+		File generatedJarFile = new File(outputDirectory, GENERATED_JAR_FILE_NAME_TEMPLATE);
 		FileOutputStream fileOutputStream = null;
 		JarOutputStream jarOutputStream = null;
 
@@ -73,7 +71,10 @@ import javax.xml.bind.DatatypeConverter;
 			jarOutputStream.putNextEntry(new JarEntry(
 					importedFacesPackagesDirectoryName + ClassFileUtil.getClassFileName(ImportedFacesPackages.class)));
 
-			byte[] byteCode = ImportedFacesPackagesByteCodeUtil.getModifiedByteCode(additionalPackagesToImport);
+			Set<String> classesToImport = new LinkedHashSet<String>(servletContainerInitializerClasses);
+			classesToImport.addAll(additionalClassesToImport);
+
+			byte[] byteCode = ImportedFacesPackagesByteCodeUtil.getModifiedByteCode(classesToImport);
 			jarOutputStream.write(byteCode);
 
 			jarOutputStream.closeEntry();
@@ -103,15 +104,29 @@ import javax.xml.bind.DatatypeConverter;
 			byte[] bytes = Files.readAllBytes(generatedJarFilePath);
 			String generatedJarMD5Sum = DatatypeConverter.printHexBinary(messageDigest.digest(bytes));
 			String generatedJarMD5FileName = GENERATED_JAR_FILE_NAME_TEMPLATE.replace(MD5SUM_TOKEN, generatedJarMD5Sum);
-			Path generatedJarMD5FilePath = new File(generatedJarOutputDir, generatedJarMD5FileName).toPath();
-
-			return Files.move(generatedJarFilePath, generatedJarMD5FilePath, StandardCopyOption.REPLACE_EXISTING)
-				.toString();
+			Path generatedJarMD5FilePath = new File(outputDirectory, generatedJarMD5FileName).toPath();
+			Files.move(generatedJarFilePath, generatedJarMD5FilePath, StandardCopyOption.REPLACE_EXISTING);
 		}
 		finally {
 
 			CloseableUtil.close(jarOutputStream);
 			CloseableUtil.close(fileOutputStream);
 		}
+	}
+
+	/* package-private */ static String getFilePath(String... dirNames) {
+
+		StringBuilder stringBuilder = new StringBuilder();
+
+		for (String dirName : dirNames) {
+
+			stringBuilder.append(dirName);
+
+			if (!dirName.endsWith(File.separator)) {
+				stringBuilder.append(File.separator);
+			}
+		}
+
+		return stringBuilder.toString();
 	}
 }
