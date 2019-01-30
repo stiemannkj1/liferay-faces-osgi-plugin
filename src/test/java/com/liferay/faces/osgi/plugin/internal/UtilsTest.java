@@ -37,9 +37,16 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import com.liferay.faces.TestServletContainerInitializer;
+import com.liferay.faces.alloy.taghandler.LoadConstants;
 import com.liferay.faces.osgi.plugin.internal.a.TestClassA;
 import com.liferay.faces.osgi.plugin.internal.b.TestClassB;
-
+import java.net.URI;
+import java.net.URISyntaxException;
+import java.security.CodeSource;
+import java.security.ProtectionDomain;
+import java.util.jar.JarFile;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathException;
 
 /**
  * @author  Kyle Stiemann
@@ -72,8 +79,18 @@ public final class UtilsTest {
 	}
 
 	@Test
-	public final void testFacesXMLUtil() throws IOException {
-		Assert.fail("TODO");
+	public final void testFacesXMLUtil() throws IOException, URISyntaxException, ParserConfigurationException,
+		XPathException {
+
+		Class<?> facesJarClass = LoadConstants.class;
+		ProtectionDomain protectionDomain = facesJarClass.getProtectionDomain();
+		CodeSource codeSource = protectionDomain.getCodeSource();
+		URL facesJarURL = codeSource.getLocation();
+		URI facesJarURI = facesJarURL.toURI();
+		JarFile facesJarFile = new JarFile(new File(facesJarURI));
+		Set<String> classNames = FacesXMLUtil.getClassNames(unmodifiableSet(facesJarFile), null);
+		Assert.assertTrue(classNames.contains(facesJarClass.getName()));
+		Assert.fail("// TODO find all classes in *.taglib.xml and faces-config.xml and see if they exist in classNames");
 	}
 
 	@Test

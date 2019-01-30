@@ -64,7 +64,7 @@ import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.
 			DocumentBuilder documentBuilder = documentBuilderFactory.newDocumentBuilder();
 			XPathFactory xpathFactory = XPathFactory.newInstance();
 			XPath xPath = xpathFactory.newXPath();
-			XPathExpression xPathExpression = xPath.compile("//*[count(./*) = 0]");
+			XPathExpression xPathExpression = xPath.compile("//*[count(./*) = 0][normalize-space(text())]");
 
 			for (JarFile facesJar : facesJars) {
 
@@ -101,7 +101,7 @@ import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.
 		return Collections.unmodifiableSet(classNames);
 	}
 
-	/* package-private */ static Set<String> getClassNames(JarFile jarFile, JarEntry xmlJarEntry, DocumentBuilder documentBuilder,
+	private static Set<String> getClassNames(JarFile jarFile, JarEntry xmlJarEntry, DocumentBuilder documentBuilder,
 		XPathExpression xPathExpression) throws IOException {
 
 		Set<String> classNames = new HashSet<String>();
@@ -116,13 +116,13 @@ import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.
 			for (int i = 0; i < nodeListLength; i++) {
 
 				Node node = nodeList.item(i);
-				String nodeValue = node.getNodeValue();
+				String textContent = node.getTextContent();
 
 				// Remove Generic Data
-				nodeValue = nodeValue.replaceAll("[<][\\S\\s]*[>]", "");
+				textContent = textContent.replaceAll("[<][\\S\\s]*[>]", "");
 
-				if (SourceVersion.isName(nodeValue)) {
-					classNames.add(nodeValue);
+				if (SourceVersion.isName(textContent)) {
+					classNames.add(textContent);
 				}
 			}
 
