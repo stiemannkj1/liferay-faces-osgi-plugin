@@ -16,11 +16,15 @@ package com.liferay.faces.osgi.plugin.internal;
 import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Method;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.CodeSource;
 import java.security.NoSuchAlgorithmException;
+import java.security.ProtectionDomain;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
@@ -32,6 +36,8 @@ import java.util.stream.Collectors;
 import javax.servlet.ServletContainerInitializer;
 import javax.servlet.ServletContext;
 import javax.servlet.ServletException;
+import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.xpath.XPathException;
 
 import org.junit.Assert;
 import org.junit.Test;
@@ -40,13 +46,7 @@ import com.liferay.faces.TestServletContainerInitializer;
 import com.liferay.faces.alloy.taghandler.LoadConstants;
 import com.liferay.faces.osgi.plugin.internal.a.TestClassA;
 import com.liferay.faces.osgi.plugin.internal.b.TestClassB;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.security.CodeSource;
-import java.security.ProtectionDomain;
-import java.util.jar.JarFile;
-import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.xpath.XPathException;
+
 
 /**
  * @author  Kyle Stiemann
@@ -87,10 +87,22 @@ public final class UtilsTest {
 		CodeSource codeSource = protectionDomain.getCodeSource();
 		URL facesJarURL = codeSource.getLocation();
 		URI facesJarURI = facesJarURL.toURI();
-		JarFile facesJarFile = new JarFile(new File(facesJarURI));
-		Set<String> classNames = FacesXMLUtil.getClassNames(unmodifiableSet(facesJarFile), null);
+		File facesJar = new File(facesJarURI);
+		Set<String> classNames = FacesXMLUtil.getClassNames(unmodifiableSet(facesJar), null);
 		Assert.assertTrue(classNames.contains(facesJarClass.getName()));
-		Assert.fail("// TODO find all classes in *.taglib.xml and faces-config.xml and see if they exist in classNames");
+
+		for (String className : classNames) {
+
+			try {
+
+				ClassLoader classLoader = facesJarClass.getClassLoader();
+				classLoader.loadClass(className);
+			}
+			catch (ClassNotFoundException e) {
+				throw new AssertionError("Failed to load class " + className + " from jar " + facesJar.getName() + ": ",
+					e);
+			}
+		}
 	}
 
 	@Test

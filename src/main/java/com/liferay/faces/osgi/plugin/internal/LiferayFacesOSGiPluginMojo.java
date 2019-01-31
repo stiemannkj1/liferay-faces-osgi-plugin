@@ -66,7 +66,7 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 	public final void execute() throws MojoExecutionException {
 
 		Log log = getLog();
-		Set<JarFile> facesJars = new HashSet<JarFile>();
+		Set<File> facesJars = new HashSet<File>();
 		Set<Artifact> artifacts = project.getArtifacts();
 
 		for (Artifact artifact : artifacts) {
@@ -75,14 +75,7 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 			String type = artifact.getType();
 
 			if (Artifact.SCOPE_PROVIDED.equalsIgnoreCase(scope) && "jar".equalsIgnoreCase(type)) {
-
-				try {
-					facesJars.add(new JarFile(artifact.getFile()));
-				}
-				catch (IOException e) {
-					log.error("Failed to convert " + artifact.getGroupId() + ":" + artifact.getArtifactId() +
-						" into JarFile. Unable to add imports from this Faces Jar.", e);
-				}
+				facesJars.add(artifact.getFile());
 			}
 		}
 

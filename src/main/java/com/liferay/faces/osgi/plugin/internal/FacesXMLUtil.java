@@ -13,8 +13,11 @@
  */
 package com.liferay.faces.osgi.plugin.internal;
 
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
+import java.net.URLClassLoader;
 import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashSet;
@@ -50,11 +53,10 @@ import org.xml.sax.SAXException;
 		throw new AssertionError();
 	}
 
-	/* package-private */ static Set<String> getClassNames(Set<JarFile> facesJars, Log log) throws ParserConfigurationException,
+	/* package-private */ static Set<String> getClassNames(Set<File> facesJars, Log log) throws ParserConfigurationException,
 		XPathException {
 
 		Set<String> classNames = new HashSet<String>();
-		InputStream inputStream = null;
 
 		if (!facesJars.isEmpty()) {
 
@@ -64,9 +66,23 @@ import org.xml.sax.SAXException;
 			XPath xPath = xpathFactory.newXPath();
 			XPathExpression xPathExpression = xPath.compile("//*[count(./*) = 0][normalize-space(text())]");
 
-			for (JarFile facesJar : facesJars) {
+			for (File facesJar : facesJars) {
 
-				Enumeration<JarEntry> entries = facesJar.entries();
+				JarFile facesJarFile = null;
+
+				try {
+					facesJarFile = new JarFile(facesJar);
+				}
+				catch (IOException e) {
+
+					CloseableUtil.close(facesJarFile);
+					log.error("Failed to convert " + facesJar.getName() +
+						" into JarFile. Unable to add imports from this Faces Jar.", e);
+
+					continue;
+				}
+
+				Enumeration<JarEntry> entries = facesJarFile.entries();
 
 				while (entries.hasMoreElements()) {
 
@@ -80,18 +96,22 @@ import org.xml.sax.SAXException;
 							(name.startsWith(LiferayFacesOSGiPluginMojo.META_INF) && name.endsWith(".taglib.xml"))) {
 
 						try {
-							inputStream = facesJar.getInputStream(jarEntry);
-							classNames.addAll(getClassNames(facesJar, jarEntry, documentBuilder, xPathExpression));
+
+							ClassLoader classLoader = null;
+
+							if (!facesConfig) {
+								classLoader = new URLClassLoader(new URL[] { facesJar.toURI().toURL() },
+										FacesXMLUtil.class.getClassLoader());
+							}
+
+							classNames.addAll(getClassNames(facesJarFile, jarEntry, classLoader, documentBuilder,
+									xPathExpression));
 						}
 						catch (IOException e) {
 							log.error("Failed to read " + name + " from " + facesJar.getName() +
 								". Unable to add imports from this file.", e);
 						}
-						finally {
-							CloseableUtil.close(inputStream);
-						}
 					}
-
 				}
 			}
 		}
@@ -99,11 +119,11 @@ import org.xml.sax.SAXException;
 		return Collections.unmodifiableSet(classNames);
 	}
 
-	private static Set<String> getClassNames(JarFile jarFile, JarEntry xmlJarEntry, DocumentBuilder documentBuilder,
-		XPathExpression xPathExpression) throws IOException {
+	private static Set<String> getClassNames(JarFile facesJar, JarEntry xmlJarEntry, ClassLoader jarClassLoader,
+		DocumentBuilder documentBuilder, XPathExpression xPathExpression) throws IOException {
 
 		Set<String> classNames = new HashSet<String>();
-		InputStream inputStream = jarFile.getInputStream(xmlJarEntry);
+		InputStream inputStream = facesJar.getInputStream(xmlJarEntry);
 
 		try {
 
@@ -119,8 +139,20 @@ import org.xml.sax.SAXException;
 				// Remove Generic Data
 				textContent = textContent.replaceAll("[<][\\S\\s]*[>]", "");
 
-				if (SourceVersion.isName(textContent)) {
-					classNames.add(textContent);
+				if (textContent.contains(".") && !SourceVersion.isKeyword(textContent) &&
+						SourceVersion.isName(textContent)) {
+
+					try {
+
+						if (jarClassLoader != null) {
+							Class.forName(textContent, false, jarClassLoader);
+						}
+
+						classNames.add(textContent);
+					}
+					catch (ClassNotFoundException e) {
+						// Do nothing.
+					}
 				}
 			}
 
