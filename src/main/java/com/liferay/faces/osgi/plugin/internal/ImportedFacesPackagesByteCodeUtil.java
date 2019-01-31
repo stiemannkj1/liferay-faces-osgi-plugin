@@ -13,9 +13,7 @@
  */
 package com.liferay.faces.osgi.plugin.internal;
 
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Set;
 
 import org.objectweb.asm.ClassReader;

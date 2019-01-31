@@ -101,7 +101,7 @@ public final class LiferayFacesOSGiPluginMojo extends AbstractMojo {
 				importedClasses);
 		}
 		catch (IOException | ParserConfigurationException | XPathException e) {
-			throw new MojoExecutionException("TODO", e);
+			throw new MojoExecutionException("Failed to generate import JAR.", e);
 		}
 	}
 }

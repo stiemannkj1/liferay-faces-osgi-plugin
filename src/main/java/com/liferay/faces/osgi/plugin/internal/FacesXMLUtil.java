@@ -40,8 +40,6 @@ import org.w3c.dom.NodeList;
 
 import org.xml.sax.SAXException;
 
-import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.META_INF_FACES_CONFIG_XML;
-
 
 /**
  * @author  Kyle Stiemann
@@ -74,7 +72,7 @@ import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.
 
 					JarEntry jarEntry = entries.nextElement();
 					String name = jarEntry.getName();
-					boolean facesConfig = META_INF_FACES_CONFIG_XML.equals(name) ||
+					boolean facesConfig = LiferayFacesOSGiPluginMojo.META_INF_FACES_CONFIG_XML.equals(name) ||
 						(name.startsWith(LiferayFacesOSGiPluginMojo.META_INF) &&
 							name.endsWith("." + LiferayFacesOSGiPluginMojo.FACES_CONFIG_XML));
 

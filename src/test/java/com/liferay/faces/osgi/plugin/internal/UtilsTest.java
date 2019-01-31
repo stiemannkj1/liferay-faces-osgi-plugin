@@ -154,7 +154,6 @@ public final class UtilsTest {
 				serviceLoader.iterator().next().getClass().getName());
 		}
 		finally {
-
 			Files.walk(temporaryDirectory).map(Path::toFile).sorted(Comparator.reverseOrder()).forEach(File::delete);
 		}
 	}

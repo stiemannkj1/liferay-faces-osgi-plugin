@@ -23,10 +23,6 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import org.apache.maven.plugin.MojoExecutionException;
-
-import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.SERVLET_CONTAINER_INITIALIZER_FILE_PATH;
-
 
 /**
  * @author  Kyle Stiemann
@@ -47,7 +43,7 @@ import static com.liferay.faces.osgi.plugin.internal.LiferayFacesOSGiPluginMojo.
 		try {
 
 			inputStream = LiferayFacesOSGiPluginMojo.class.getResourceAsStream("/" +
-					SERVLET_CONTAINER_INITIALIZER_FILE_PATH);
+				LiferayFacesOSGiPluginMojo.SERVLET_CONTAINER_INITIALIZER_FILE_PATH);
 			inputStreamReader = new InputStreamReader(inputStream, StandardCharsets.UTF_8);
 			bufferedReader = new BufferedReader(inputStreamReader);
 
